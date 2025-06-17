@@ -1,3 +1,5 @@
+import os
+bot_token = os.environ["7661086230:AAG8OBew5rI9emcVbJjWFHEymXAnq8vU9kY"]
 import logging
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
