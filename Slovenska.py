@@ -413,11 +413,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Запуск
 def main():
-    TOKEN = os.environ.get("7661086230:AAG8OBew5rI9emcVbJjWFHEymXAnq8vU9kY")
+    TOKEN = os.getenv("BOT_TOKEN")
     if not TOKEN:
         raise RuntimeError("❌ Переменная окружения BOT_TOKEN не установлена.")
 
-    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("task", daily_task))
@@ -427,5 +427,3 @@ def main():
 
     app.run_polling()
 
-if __name__ == "__main__":
-    main()
