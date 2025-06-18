@@ -1,56 +1,57 @@
 import logging
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import (
-    ApplicationBuilder,
-    ContextTypes,
-    CommandHandler,
-    MessageHandler,
-    filters
-)
+import os
 import sqlite3
 import random
 from datetime import datetime
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
 # Логирование
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 
 # Инициализация БД
 def init_db():
-    conn = sqlite3.connect('slovene_bot.db')
+    conn = sqlite3.connect("slovene_bot.db")
     cursor = conn.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY,
-        username TEXT,
-        level INTEGER DEFAULT 1,
-        score INTEGER DEFAULT 0,
-        last_active TEXT
-    )
-    ''')
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS homework (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        questions TEXT,
-        answers TEXT,
-        is_checked BOOLEAN DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(user_id)
-    )
-    ''')
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            level INTEGER DEFAULT 1,
+            score INTEGER DEFAULT 0,
+            last_active TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS homework (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            questions TEXT,
+            answers TEXT,
+            is_checked BOOLEAN DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id)
+        )
+    """)
     conn.commit()
     conn.close()
 
 init_db()
 
-# Основная клавиатура
+# Клавиатура
 def get_main_keyboard():
     return ReplyKeyboardMarkup([
-        ['/start', '/task'],
-        ['/homework', '/progress']
+        ["/start", "/task"],
+        ["/homework", "/progress"]
     ], resize_keyboard=True)
 
 # Словарь
@@ -281,12 +282,15 @@ def generate_task():
 # Команды
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    conn = sqlite3.connect('slovene_bot.db')
+    conn = sqlite3.connect("slovene_bot.db")
     cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO users (user_id, username, last_active) VALUES (?, ?, ?)',
-                   (user.id, user.username, datetime.now().isoformat()))
+    cursor.execute("""
+        INSERT OR IGNORE INTO users (user_id, username, last_active)
+        VALUES (?, ?, ?)
+    """, (user.id, user.username, datetime.now().isoformat()))
     conn.commit()
     conn.close()
+
     await update.message.reply_text(
         "🇸🇮 Добро пожаловать в бота для изучения словенского языка!\n\n"
         "/task - задание\n"
@@ -297,7 +301,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def daily_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task = generate_task()
-    context.user_data['current_task'] = task
+    context.user_data["current_task"] = task
     await update.message.reply_text(
         f"📝 Задание:\n{task['question']}",
         reply_markup=get_main_keyboard()
@@ -306,33 +310,34 @@ async def daily_task(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def homework(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     tasks = [generate_task() for _ in range(4)]
-    questions = [t['question'] for t in tasks]
-    answers = [t['answer'] for t in tasks]
+    questions = [t["question"] for t in tasks]
+    answers = [t["answer"] for t in tasks]
 
-    conn = sqlite3.connect('slovene_bot.db')
+    conn = sqlite3.connect("slovene_bot.db")
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute("""
         INSERT INTO homework (user_id, questions, answers)
         VALUES (?, ?, ?)
-    ''', (user_id, '\n'.join(questions), '\n'.join(answers)))
+    """, (user_id, "\n".join(questions), "\n".join(answers)))
     conn.commit()
     conn.close()
 
-    context.user_data['current_homework'] = answers
+    context.user_data["current_homework"] = answers
 
     await update.message.reply_text(
         "📚 Домашка. Ответьте на все задания одним сообщением, по одному на строке:\n\n" +
-        '\n'.join(questions),
+        "\n".join(questions),
         reply_markup=get_main_keyboard()
     )
 
 async def progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    conn = sqlite3.connect('slovene_bot.db')
+    conn = sqlite3.connect("slovene_bot.db")
     cursor = conn.cursor()
-    cursor.execute('SELECT score FROM users WHERE user_id = ?', (user_id,))
+    cursor.execute("SELECT score FROM users WHERE user_id = ?", (user_id,))
     result = cursor.fetchone()
     conn.close()
+
     score = result[0] if result else 0
     level = min(6, score // 100 + 1)
 
@@ -341,15 +346,14 @@ async def progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=get_main_keyboard()
     )
 
-# Обработка сообщений: задача или домашка
+# Обработка сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
     user_id = update.effective_user.id
 
-    if 'current_homework' in context.user_data:
-        # Проверка домашки
-        answers = context.user_data['current_homework']
-        user_lines = [line.strip().lower() for line in text.split('\n') if line.strip()]
+    if "current_homework" in context.user_data:
+        answers = context.user_data["current_homework"]
+        user_lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
         if len(user_lines) != len(answers):
             await update.message.reply_text(
                 "⚠️ Пожалуйста, ответьте **ровно на все вопросы**, по одному в строке.",
@@ -360,10 +364,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         correct_count = sum(1 for u, a in zip(user_lines, answers) if u == a)
         points = correct_count * 5
 
-        conn = sqlite3.connect('slovene_bot.db')
+        conn = sqlite3.connect("slovene_bot.db")
         cursor = conn.cursor()
-        cursor.execute('UPDATE users SET score = score + ? WHERE user_id = ?', (points, user_id))
-        cursor.execute('UPDATE homework SET is_checked = 1 WHERE user_id = ? AND is_checked = 0', (user_id,))
+        cursor.execute("UPDATE users SET score = score + ? WHERE user_id = ?", (points, user_id))
+        cursor.execute("UPDATE homework SET is_checked = 1 WHERE user_id = ? AND is_checked = 0", (user_id,))
         conn.commit()
         conn.close()
 
@@ -376,33 +380,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
             "📋 Результаты домашки:\n\n" +
-            '\n'.join(feedback) +
+            "\n".join(feedback) +
             f"\n\n🏅 Итог: {correct_count} из {len(answers)} — +{points} баллов!",
             reply_markup=get_main_keyboard()
         )
 
-        del context.user_data['current_homework']
+        del context.user_data["current_homework"]
 
-    elif 'current_task' in context.user_data:
-        # Проверка задания
-        task = context.user_data['current_task']
-        if text == task['answer']:
-            conn = sqlite3.connect('slovene_bot.db')
+    elif "current_task" in context.user_data:
+        task = context.user_data["current_task"]
+        if text == task["answer"]:
+            conn = sqlite3.connect("slovene_bot.db")
             cursor = conn.cursor()
-            cursor.execute('UPDATE users SET score = score + 10 WHERE user_id = ?', (user_id,))
+            cursor.execute("UPDATE users SET score = score + 10 WHERE user_id = ?", (user_id,))
             conn.commit()
             conn.close()
             await update.message.reply_text("✅ Верно! +10 баллов!", reply_markup=get_main_keyboard())
         else:
-            await update.message.reply_text(f"❌ Неверно. Правильный ответ: {task['answer']}", reply_markup=get_main_keyboard())
-        del context.user_data['current_task']
-
+            await update.message.reply_text(
+                f"❌ Неверно. Правильный ответ: {task['answer']}",
+                reply_markup=get_main_keyboard()
+            )
+        del context.user_data["current_task"]
     else:
-        await update.message.reply_text("ℹ️ Сначала используйте команду /task или /homework.", reply_markup=get_main_keyboard())
+        await update.message.reply_text(
+            "ℹ️ Сначала используйте команду /task или /homework.",
+            reply_markup=get_main_keyboard()
+        )
 
 # Запуск
 def main():
-    app = ApplicationBuilder().token("7661086230:AAG8OBew5rI9emcVbJjWFHEymXAnq8vU9kY").build()
+    TOKEN = os.environ.get("7661086230:AAG8OBew5rI9emcVbJjWFHEymXAnq8vU9kY")
+    if not TOKEN:
+        raise RuntimeError("❌ Переменная окружения BOT_TOKEN не установлена.")
+
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("task", daily_task))
