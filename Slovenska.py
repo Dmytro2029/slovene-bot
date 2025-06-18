@@ -417,7 +417,7 @@ def main():
     if not TOKEN:
         raise RuntimeError("❌ Переменная окружения BOT_TOKEN не установлена.")
 
-   app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("task", daily_task))
